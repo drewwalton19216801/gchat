@@ -1,1 +1,4 @@
 .gchat-conversations.json
+.env
+web/dist
+web/node_modules
