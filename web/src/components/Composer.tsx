@@ -8,9 +8,10 @@ type Props = {
   onStop: () => void;
   disabled?: boolean;
   canSend: boolean;
+  isHealthy?: boolean;
 };
 
-export function Composer({ value, onChange, onSend, onStop, disabled, canSend }: Props) {
+export function Composer({ value, onChange, onSend, onStop, disabled, canSend, isHealthy = true }: Props) {
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -22,16 +23,21 @@ export function Composer({ value, onChange, onSend, onStop, disabled, canSend }:
     <div className="flex items-end gap-3">
       <div className="flex-1 relative">
         <textarea
-          className="w-full glass rounded-2xl p-4 text-sm text-white placeholder-white/60 resize-none focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass min-h-[60px]"
+          className={clsx(
+            "w-full glass rounded-2xl p-4 text-sm text-white placeholder-white/60 resize-none focus:outline-none focus:ring-2 transition-glass min-h-[60px]",
+            isHealthy
+              ? "focus:ring-white/30 focus:glass-strong"
+              : "focus:ring-red-400/30 border border-red-400/30"
+          )}
           rows={3}
-          placeholder="Type your message here... ✨"
+          placeholder={isHealthy ? "Type your message here... ✨" : "Backend unavailable - cannot send messages"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={disabled}
+          disabled={disabled || !isHealthy}
         />
         <div className="absolute bottom-2 right-2 text-xs text-white/50">
-          {disabled ? "⏳" : "💬"}
+          {!isHealthy ? "🔴" : disabled ? "⏳" : "💬"}
         </div>
       </div>
       <div className="flex flex-col gap-3">
@@ -46,8 +52,8 @@ export function Composer({ value, onChange, onSend, onStop, disabled, canSend }:
           disabled={!canSend}
           title="Send (Enter)"
         >
-          {canSend ? "🚀" : "⏸️"}
-          <span>Send</span>
+          {!isHealthy ? "🔴" : canSend ? "🚀" : "⏸️"}
+          <span>{!isHealthy ? "Offline" : "Send"}</span>
         </button>
         <button
           className={clsx(

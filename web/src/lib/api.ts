@@ -118,6 +118,45 @@ async function streamChatInner(req: ChatRequest, signal?: AbortSignal): Promise<
   return handlers;
 }
 
+type HealthResponse = {
+  ok: boolean;
+};
+
+async function checkHealth(): Promise<{ healthy: boolean; error?: string }> {
+  try {
+    const response = await fetch("/api/health", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      // Reduce timeout for faster detection of issues
+      signal: AbortSignal.timeout(3000)
+    });
+    
+    if (!response.ok) {
+      // 404 or other HTTP errors indicate backend is down
+      return { healthy: false, error: `Backend unavailable (HTTP ${response.status})` };
+    }
+    
+    const data: HealthResponse = await response.json();
+    return { healthy: data.ok === true };
+  } catch (error: any) {
+    // Network errors, timeouts, or JSON parsing errors
+    let errorMessage = "Network error";
+    if (error?.name === 'TimeoutError') {
+      errorMessage = "Backend connection timeout";
+    } else if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
+      errorMessage = "Backend server is not responding";
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
+    return {
+      healthy: false,
+      error: errorMessage
+    };
+  }
+}
+
 export const api = {
   streamChat: streamChatInner,
+  checkHealth,
 };

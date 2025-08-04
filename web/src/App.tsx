@@ -3,6 +3,7 @@ import { ModelSelector } from "./components/ModelSelector";
 import { MessageList } from "./components/MessageList";
 import { Composer } from "./components/Composer";
 import { ErrorBanner } from "./components/ErrorBanner";
+import { HealthStatus } from "./components/HealthStatus";
 import { api } from "./lib/api";
 import "./styles/index.css";
 
@@ -33,13 +34,78 @@ export default function App() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [isHealthy, setIsHealthy] = useState(true);
+  const [healthError, setHealthError] = useState<string | undefined>();
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const healthCheckRef = useRef<number | null>(null);
 
-  const canSend = useMemo(() => input.trim().length > 0 && !streaming, [input, streaming]);
+  const canSend = useMemo(() => input.trim().length > 0 && !streaming && isHealthy, [input, streaming, isHealthy]);
+
+  // Health check function
+  const checkBackendHealth = async () => {
+    setIsCheckingHealth(true);
+    console.log("Starting health check...");
+    try {
+      const result = await api.checkHealth();
+      console.log("Health check result:", result);
+      setIsHealthy(result.healthy);
+      setHealthError(result.error);
+    } catch (error: any) {
+      console.log("Health check error:", error);
+      setIsHealthy(false);
+      setHealthError(error?.message || "Health check failed");
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
+
+  // Set up periodic health checks
+  useEffect(() => {
+    // Initial health check
+    checkBackendHealth();
+
+    // Set up periodic checks - more frequent when unhealthy
+    const interval = isHealthy ? 30000 : 10000; // 30s when healthy, 10s when unhealthy
+    healthCheckRef.current = setInterval(checkBackendHealth, interval);
+
+    return () => {
+      if (healthCheckRef.current) {
+        clearInterval(healthCheckRef.current);
+      }
+    };
+  }, [isHealthy]); // Re-run when health status changes
+
+  // Also check health when network errors occur during chat
+  const handleNetworkError = (errorMessage: string) => {
+    setError(errorMessage);
+    // Trigger immediate health check if it looks like a network error
+    if (errorMessage.toLowerCase().includes('network') ||
+        errorMessage.toLowerCase().includes('fetch') ||
+        errorMessage.toLowerCase().includes('failed')) {
+      checkBackendHealth();
+    }
+  };
 
   const onSend = async () => {
     if (!canSend) return;
     setError(null);
+
+    // Perform a health check right before sending to ensure backend is available
+    console.log("Performing pre-send health check...");
+    const healthResult = await api.checkHealth();
+    if (!healthResult.healthy) {
+      setIsHealthy(false);
+      setHealthError(healthResult.error);
+      setError(`Cannot send message: ${healthResult.error || 'Backend is unavailable'}`);
+      return;
+    }
+
+    // Update health status if it was previously unhealthy
+    if (!isHealthy) {
+      setIsHealthy(true);
+      setHealthError(undefined);
+    }
 
     const newMsgs: Message[] = [
       ...messages,
@@ -80,7 +146,7 @@ export default function App() {
       });
 
       onError((msg) => {
-        setError(msg);
+        handleNetworkError(msg);
       });
 
       onDone(() => {
@@ -88,7 +154,7 @@ export default function App() {
         abortRef.current = null;
       });
     } catch (e: any) {
-      setError(e?.message || "Failed to send message");
+      handleNetworkError(e?.message || "Failed to send message");
       setStreaming(false);
       abortRef.current = null;
     }
@@ -170,6 +236,11 @@ export default function App() {
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
 
       <main className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-8 relative z-10" role="main">
+        <HealthStatus
+          isHealthy={isHealthy}
+          error={healthError}
+          isChecking={isCheckingHealth}
+        />
         <div className="mb-6">
           <label htmlFor="system-prompt" className="block text-sm font-medium mb-2 text-white/90">
             System prompt (optional)
@@ -199,9 +270,10 @@ export default function App() {
             value={input}
             onChange={setInput}
             onSend={onSend}
-            disabled={streaming}
+            disabled={streaming || !isHealthy}
             onStop={onStop}
             canSend={canSend}
+            isHealthy={isHealthy}
           />
           <div className="mt-3 flex items-center justify-between text-xs text-white/70">
             <span>
