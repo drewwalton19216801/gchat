@@ -1,0 +1,239 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ModelSelector } from "./components/ModelSelector";
+import { MessageList } from "./components/MessageList";
+import { Composer } from "./components/Composer";
+import { ErrorBanner } from "./components/ErrorBanner";
+import { api } from "./lib/api";
+import "./styles/index.css";
+
+export type Role = "system" | "user" | "assistant";
+
+export interface Message {
+  id: string;
+  role: Role;
+  content: string;
+  createdAt: number;
+}
+
+function useLocalStorageState<T>(key: string, initial: T) {
+  const [state, setState] = useState<T>(() => {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : initial;
+  });
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(state));
+  }, [key, state]);
+  return [state, setState] as const;
+}
+
+export default function App() {
+  const [model, setModel] = useLocalStorageState("gchat:model", "openrouter/auto");
+  const [systemPrompt, setSystemPrompt] = useLocalStorageState("gchat:sys", "");
+  const [messages, setMessages] = useLocalStorageState<Message[]>("gchat:messages", []);
+  const [input, setInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const canSend = useMemo(() => input.trim().length > 0 && !streaming, [input, streaming]);
+
+  const onSend = async () => {
+    if (!canSend) return;
+    setError(null);
+
+    const newMsgs: Message[] = [
+      ...messages,
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: input,
+        createdAt: Date.now(),
+      },
+    ];
+    setMessages(newMsgs);
+    setInput("");
+    setStreaming(true);
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    try {
+      const req: { model: string; messages: { role: "system" | "user" | "assistant"; content: string }[] } = {
+        model,
+        messages: [
+          ...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []),
+          ...newMsgs.map((m) => ({ role: m.role as Role, content: m.content })),
+        ],
+      };
+
+      const { onDelta, onError, onDone } = await api.streamChat(req, ac.signal);
+
+      let assistantId = crypto.randomUUID();
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "", createdAt: Date.now() },
+      ]);
+
+      onDelta((chunk) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m))
+        );
+      });
+
+      onError((msg) => {
+        setError(msg);
+      });
+
+      onDone(() => {
+        setStreaming(false);
+        abortRef.current = null;
+      });
+    } catch (e: any) {
+      setError(e?.message || "Failed to send message");
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  };
+
+  const onStop = () => {
+    abortRef.current?.abort();
+    setStreaming(false);
+    abortRef.current = null;
+  };
+
+  const onClear = () => {
+    setMessages([]);
+    setError(null);
+    setInput("");
+  };
+
+  const onExport = () => {
+    const blob = new Blob([JSON.stringify({ model, systemPrompt, messages }, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "gchat-conversation.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="min-h-dvh relative">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full blur-3xl float-animation"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl float-animation" style={{animationDelay: '2s'}}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-indigo-400/15 to-purple-400/15 rounded-full blur-3xl float-animation" style={{animationDelay: '4s'}}></div>
+      </div>
+
+      <a
+        href="#composer"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md glass focus:px-3 focus:py-2 focus:text-white"
+      >
+        Skip to composer
+      </a>
+      <header
+        className="glass sticky top-0 z-40 border-b border-white/20"
+        role="banner"
+      >
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 flex gap-2 sm:gap-3 items-center">
+          <h1 className="font-bold text-lg sm:text-xl text-white glow" aria-label="GChat home">
+            ✨ GChat
+          </h1>
+          <div className="flex-1" />
+          <div className="flex items-center gap-3">
+            <label htmlFor="model" className="sr-only">
+              Model
+            </label>
+            <ModelSelector value={model} onChange={setModel} />
+            <button
+              className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
+              onClick={onExport}
+              aria-label="Export conversation as JSON"
+              title="Export conversation as JSON"
+            >
+              📤 Export
+            </button>
+            <button
+              className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
+              onClick={onClear}
+              aria-label="Clear conversation"
+              title="Clear conversation"
+            >
+              🗑️ Clear
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
+
+      <main className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-8 relative z-10" role="main">
+        <div className="mb-6">
+          <label htmlFor="system-prompt" className="block text-sm font-medium mb-2 text-white/90">
+            System prompt (optional)
+          </label>
+          <textarea
+            id="system-prompt"
+            className="w-full rounded-xl glass p-4 text-sm text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass resize-none"
+            rows={2}
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            placeholder="You are a helpful assistant..."
+            aria-describedby="system-prompt-help"
+          />
+          <p id="system-prompt-help" className="mt-2 text-xs text-white/70">
+            Preface the assistant with a role or instructions applied to the entire conversation.
+          </p>
+        </div>
+        <MessageList messages={messages} />
+      </main>
+
+      <footer
+        className="sticky bottom-0 w-full glass border-t border-white/20 relative z-10"
+        role="contentinfo"
+      >
+        <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+          <Composer
+            value={input}
+            onChange={setInput}
+            onSend={onSend}
+            disabled={streaming}
+            onStop={onStop}
+            canSend={canSend}
+          />
+          <div className="mt-3 flex items-center justify-between text-xs text-white/70">
+            <span>
+              Press Enter to send, Shift+Enter for newline.{" "}
+              <button
+                className="underline underline-offset-2 hover:text-white/90 transition-colors"
+                onClick={() =>
+                  setSystemPrompt(
+                    systemPrompt ||
+                      "You are GChat, a concise and accurate assistant. Respond with helpful structure."
+                  )
+                }
+              >
+                Use default system prompt
+              </button>
+            </span>
+            <span aria-live="polite" className="flex items-center gap-2">
+              {streaming ? (
+                <>
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  Streaming...
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  Ready
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
