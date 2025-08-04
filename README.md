@@ -57,14 +57,22 @@ cd backend
 cp .env.example .env
 ```
 
-3. Edit `.env` with your configuration:
+3. Edit `.env` with your configuration (see [Environment Variables](#environment-variables) section for details):
 ```env
 # Backend configuration
 PORT=8080
-ALLOWED_ORIGIN=http://localhost:5173
-APP_URL=http://localhost:5173
+ALLOWED_ORIGIN=*
+APP_URL=http://0.0.0.0:5173
 APP_NAME=GChat
 DEFAULT_MODEL=openrouter/auto
+BACKEND_URL=http://0.0.0.0:8080
+
+# Backend server binding configuration
+BACKEND_HOST=0.0.0.0
+
+# Frontend development server configuration
+VITE_HOST=0.0.0.0
+VITE_PORT=5173
 
 # OpenRouter - Get your key from https://openrouter.ai/
 OPENROUTER_API_KEY=sk-or-your-actual-api-key-here
@@ -76,9 +84,19 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 go mod download
 ```
 
-5. Run the backend server:
+5. Install godotenv (if not already installed):
 ```bash
-go run cmd/server/main.go
+go install github.com/joho/godotenv/cmd/godotenv@latest
+```
+
+6. Run the backend server using godotenv:
+```bash
+godotenv -f .env go run cmd/server/main.go
+```
+
+Alternatively, you can run from the project root:
+```bash
+godotenv -f backend/.env go run backend/cmd/server/main.go
 ```
 
 The backend will start on `http://localhost:8080`
@@ -200,15 +218,55 @@ The built files will be in the `web/dist` directory.
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Backend server port | `8080` |
-| `ALLOWED_ORIGIN` | CORS allowed origin | `http://localhost:5173` |
-| `APP_URL` | Application URL | `http://localhost:5173` |
-| `APP_NAME` | Application name | `GChat` |
-| `DEFAULT_MODEL` | Default AI model | `openrouter/auto` |
-| `OPENROUTER_API_KEY` | OpenRouter API key | Required |
-| `OPENROUTER_BASE_URL` | OpenRouter API base URL | `https://openrouter.ai/api/v1` |
+The backend uses environment variables for configuration. Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and modify as needed.
+
+#### Backend Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `PORT` | Backend server port | `8080` | No |
+| `ALLOWED_ORIGIN` | CORS allowed origin (use `*` for all origins) | `*` | No |
+| `APP_URL` | Frontend application URL | `http://0.0.0.0:5173` | No |
+| `APP_NAME` | Application name | `GChat` | No |
+| `DEFAULT_MODEL` | Default AI model to use | `openrouter/auto` | No |
+| `BACKEND_URL` | Backend server URL | `http://0.0.0.0:8080` | No |
+
+#### Network Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `BACKEND_HOST` | Backend server bind address (`0.0.0.0` for external access, `localhost` for local only) | `0.0.0.0` | No |
+| `VITE_HOST` | Frontend dev server bind address (`0.0.0.0` for external access, `localhost` for local only) | `0.0.0.0` | No |
+| `VITE_PORT` | Frontend development server port | `5173` | No |
+
+#### OpenRouter Integration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `OPENROUTER_API_KEY` | Your OpenRouter API key from [openrouter.ai](https://openrouter.ai/) | None | **Yes** |
+| `OPENROUTER_BASE_URL` | OpenRouter API base URL | `https://openrouter.ai/api/v1` | No |
+
+#### Important Notes
+
+- **OPENROUTER_API_KEY**: This is the only required environment variable. Get your API key from [OpenRouter](https://openrouter.ai/).
+- **Network Access**: Set `BACKEND_HOST=0.0.0.0` and `VITE_HOST=0.0.0.0` to allow access from other devices on your network.
+- **CORS**: Use `ALLOWED_ORIGIN=*` for development, but specify exact origins in production for security.
+- **godotenv**: Use `godotenv -f backend/.env` to load environment variables when starting the backend.
+
+#### Starting the Backend with Environment Variables
+
+The recommended way to start the backend is using `godotenv` to load the environment file:
+
+```bash
+# From the backend directory
+cd backend
+godotenv -f .env go run cmd/server/main.go
+
+# Or from the project root
+godotenv -f backend/.env go run backend/cmd/server/main.go
+```
+
+This ensures all environment variables are properly loaded from your `.env` file.
 
 ### OpenRouter Models
 
@@ -251,7 +309,7 @@ Backend:
 ```bash
 cd backend
 go test ./...
-go run cmd/server/main.go
+godotenv -f .env go run cmd/server/main.go
 ```
 
 Frontend:

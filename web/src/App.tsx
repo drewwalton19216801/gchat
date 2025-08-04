@@ -110,7 +110,7 @@ export default function App() {
     const newMsgs: Message[] = [
       ...messages,
       {
-        id: crypto.randomUUID(),
+        id: crypto?.randomUUID?.() || Math.random().toString(36).substring(2, 15),
         role: "user",
         content: input,
         createdAt: Date.now(),
@@ -133,7 +133,7 @@ export default function App() {
 
       const { onDelta, onError, onDone } = await api.streamChat(req, ac.signal);
 
-      let assistantId = crypto.randomUUID();
+      let assistantId = crypto?.randomUUID?.() || Math.random().toString(36).substring(2, 15);
       setMessages((prev) => [
         ...prev,
         { id: assistantId, role: "assistant", content: "", createdAt: Date.now() },

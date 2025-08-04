@@ -59,15 +59,30 @@ type Config struct {
 	AppURL        string
 	AppName       string
 	DefaultModel  string
+	ViteHost      string
+	VitePort      string
+	BackendHost   string
 }
 
 func loadConfig() (*Config, error) {
+	viteHost := getEnv("VITE_HOST", "localhost")
+	backendHost := getEnv("BACKEND_HOST", "localhost")
+
+	// If VITE_HOST is 0.0.0.0 and BACKEND_HOST is not explicitly set,
+	// set backend to listen on all interfaces too
+	if viteHost == "0.0.0.0" && getEnv("BACKEND_HOST", "") == "" {
+		backendHost = "0.0.0.0"
+	}
+
 	cfg := &Config{
 		Port:          getEnv("PORT", "8080"),
 		AllowedOrigin: getEnv("ALLOWED_ORIGIN", "http://localhost:5173"),
 		AppURL:        getEnv("APP_URL", "http://localhost:5173"),
 		AppName:       getEnv("APP_NAME", "GChat"),
 		DefaultModel:  getEnv("DEFAULT_MODEL", "openrouter/auto"),
+		ViteHost:      viteHost,
+		VitePort:      getEnv("VITE_PORT", "5173"),
+		BackendHost:   backendHost,
 	}
 	return cfg, nil
 }
@@ -162,9 +177,19 @@ func newRouter(cfg *Config) http.Handler {
 	// Load persisted conversations on startup (best-effort)
 	_ = store.LoadFromFile(".gchat-conversations.json")
 
-	// CORS
+	// CORS - configure allowed origins based on VITE_HOST setting
+	var allowedOrigins []string
+	if cfg.ViteHost == "0.0.0.0" {
+		// When VITE_HOST is 0.0.0.0, allow requests from any origin
+		// This is needed for external access to the frontend
+		allowedOrigins = []string{"*"}
+	} else {
+		// Default behavior - only allow the configured origin
+		allowedOrigins = []string{cfg.AllowedOrigin}
+	}
+
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{cfg.AllowedOrigin},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -404,14 +429,18 @@ func Run() error {
 		return err
 	}
 
-	addr := fmt.Sprintf(":%s", cfg.Port)
+	addr := fmt.Sprintf("%s:%s", cfg.BackendHost, cfg.Port)
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           newRouter(cfg),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	log.Printf("Server starting on %s (AllowedOrigin=%s)", addr, cfg.AllowedOrigin)
+	corsInfo := cfg.AllowedOrigin
+	if cfg.ViteHost == "0.0.0.0" {
+		corsInfo = "* (all origins - external access enabled)"
+	}
+	log.Printf("Server starting on %s (CORS=%s)", addr, corsInfo)
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
