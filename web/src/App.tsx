@@ -203,32 +203,66 @@ export default function App() {
         className="glass sticky top-0 z-40 border-b border-white/20"
         role="banner"
       >
-        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 flex gap-2 sm:gap-3 items-center">
-          <h1 className="font-bold text-lg sm:text-xl text-white glow" aria-label="GChat home">
-            ✨ GChat
-          </h1>
-          <div className="flex-1" />
-          <div className="flex items-center gap-3">
-            <label htmlFor="model" className="sr-only">
-              Model
-            </label>
-            <ModelSelector value={model} onChange={setModel} />
-            <button
-              className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
-              onClick={onExport}
-              aria-label="Export conversation as JSON"
-              title="Export conversation as JSON"
-            >
-              📤 Export
-            </button>
-            <button
-              className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
-              onClick={onClear}
-              aria-label="Clear conversation"
-              title="Clear conversation"
-            >
-              🗑️ Clear
-            </button>
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          {/* Mobile layout: stacked */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            <div className="flex items-center justify-between">
+              <h1 className="font-bold text-lg text-white glow" aria-label="GChat home">
+                ✨ GChat
+              </h1>
+              <label htmlFor="model" className="sr-only">
+                Model
+              </label>
+              <ModelSelector value={model} onChange={setModel} />
+            </div>
+            <div className="flex items-center gap-2 justify-center">
+              <button
+                className="glass-subtle rounded-lg px-2 py-1.5 text-xs text-white/90 hover:text-white transition-glass glow-hover flex-1 max-w-[120px]"
+                onClick={onExport}
+                aria-label="Export conversation as JSON"
+                title="Export conversation as JSON"
+              >
+                📤 Export
+              </button>
+              <button
+                className="glass-subtle rounded-lg px-2 py-1.5 text-xs text-white/90 hover:text-white transition-glass glow-hover flex-1 max-w-[120px]"
+                onClick={onClear}
+                aria-label="Clear conversation"
+                title="Clear conversation"
+              >
+                🗑️ Clear
+              </button>
+            </div>
+          </div>
+          
+          {/* Desktop layout: single row */}
+          <div className="hidden sm:flex gap-2 sm:gap-3 items-center">
+            <h1 className="font-bold text-lg sm:text-xl text-white glow" aria-label="GChat home">
+              ✨ GChat
+            </h1>
+            <div className="flex-1" />
+            <div className="flex items-center gap-3">
+              <label htmlFor="model" className="sr-only">
+                Model
+              </label>
+              <ModelSelector value={model} onChange={setModel} />
+              <button
+                className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
+                onClick={onExport}
+                aria-label="Export conversation as JSON"
+                title="Export conversation as JSON"
+              >
+                📤 Export
+              </button>
+              <button
+                className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
+                onClick={onClear}
+                aria-label="Clear conversation"
+                title="Clear conversation"
+              >
+                🗑️ Clear
+              </button>
+            </div>
           </div>
         </div>
       </header>
