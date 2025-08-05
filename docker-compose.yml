@@ -1,9 +1,9 @@
 services:
-  backend:
+  gchat-backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: gchat-backend:latest
+    image: itsdrewwalton/gchat-backend:latest
     environment:
       # Map envs as needed; override via .env or CLI
       # OPENROUTER_API_KEY: your-key
@@ -15,13 +15,13 @@ services:
     networks:
       - gchat
 
-  frontend:
+  gchat-frontend:
     build:
       context: .
       dockerfile: web/Dockerfile
-    image: gchat-frontend:latest
+    image: itsdrewwalton/gchat-frontend:latest
     depends_on:
-      - backend
+      - gchat-backend
     ports:
       - "3000:80"
     restart: unless-stopped
