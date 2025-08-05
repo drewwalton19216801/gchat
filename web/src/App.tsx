@@ -13,6 +13,7 @@ export interface Message {
   id: string;
   role: Role;
   content: string;
+  reasoning?: string;
   createdAt: number;
 }
 
@@ -37,6 +38,9 @@ export default function App() {
   const [isHealthy, setIsHealthy] = useState(true);
   const [healthError, setHealthError] = useState<string | undefined>();
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [reasoningEnabled, setReasoningEnabled] = useLocalStorageState("gchat:reasoning", false);
+  const [reasoningEffort, setReasoningEffort] = useLocalStorageState<"high" | "medium" | "low">("gchat:reasoning-effort", "medium");
+  const [showReasoning, setShowReasoning] = useLocalStorageState("gchat:show-reasoning", true);
   const abortRef = useRef<AbortController | null>(null);
   const healthCheckRef = useRef<number | null>(null);
 
@@ -123,7 +127,11 @@ export default function App() {
     abortRef.current = ac;
 
     try {
-      const req: { model: string; messages: { role: "system" | "user" | "assistant"; content: string }[] } = {
+      const req: {
+        model: string;
+        messages: { role: "system" | "user" | "assistant"; content: string }[];
+        reasoning?: { effort?: "high" | "medium" | "low"; exclude?: boolean };
+      } = {
         model,
         messages: [
           ...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []),
@@ -131,17 +139,31 @@ export default function App() {
         ],
       };
 
-      const { onDelta, onError, onDone } = await api.streamChat(req, ac.signal);
+      // Add reasoning configuration if enabled
+      if (reasoningEnabled) {
+        req.reasoning = {
+          effort: reasoningEffort,
+          exclude: !showReasoning,
+        };
+      }
+
+      const { onDelta, onReasoning, onError, onDone } = await api.streamChat(req, ac.signal);
 
       let assistantId = crypto?.randomUUID?.() || Math.random().toString(36).substring(2, 15);
       setMessages((prev) => [
         ...prev,
-        { id: assistantId, role: "assistant", content: "", createdAt: Date.now() },
+        { id: assistantId, role: "assistant", content: "", reasoning: "", createdAt: Date.now() },
       ]);
 
       onDelta((chunk) => {
         setMessages((prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m))
+        );
+      });
+
+      onReasoning((chunk) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, reasoning: (m.reasoning || "") + chunk } : m))
         );
       });
 
@@ -233,6 +255,46 @@ export default function App() {
                 🗑️ Clear
               </button>
             </div>
+            {/* Reasoning controls for mobile */}
+            <div className="flex items-center gap-2 justify-center">
+              <label className="flex items-center gap-1 text-xs text-white/90">
+                <input
+                  type="checkbox"
+                  checked={reasoningEnabled}
+                  onChange={(e) => setReasoningEnabled(e.target.checked)}
+                  className="rounded"
+                />
+                🧠 Reasoning
+              </label>
+              {reasoningEnabled && (
+                <>
+                  <div className="relative">
+                    <select
+                      value={reasoningEffort}
+                      onChange={(e) => setReasoningEffort(e.target.value as "high" | "medium" | "low")}
+                      className="glass-subtle rounded-lg px-2 py-1.5 text-xs text-white/90 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass min-w-[80px] pr-6"
+                      title="Reasoning Effort"
+                    >
+                      <option value="low" className="bg-gray-800 text-white">Low</option>
+                      <option value="medium" className="bg-gray-800 text-white">Medium</option>
+                      <option value="high" className="bg-gray-800 text-white">High</option>
+                    </select>
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-white/70">
+                      🔽
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-1 text-xs text-white/90">
+                    <input
+                      type="checkbox"
+                      checked={showReasoning}
+                      onChange={(e) => setShowReasoning(e.target.checked)}
+                      className="rounded"
+                    />
+                    Show
+                  </label>
+                </>
+              )}
+            </div>
           </div>
           
           {/* Desktop layout: single row */}
@@ -242,6 +304,46 @@ export default function App() {
             </h1>
             <div className="flex-1" />
             <div className="flex items-center gap-3">
+              {/* Reasoning controls for desktop */}
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-sm text-white/90">
+                  <input
+                    type="checkbox"
+                    checked={reasoningEnabled}
+                    onChange={(e) => setReasoningEnabled(e.target.checked)}
+                    className="rounded"
+                  />
+                  🧠 Reasoning
+                </label>
+                {reasoningEnabled && (
+                  <>
+                    <div className="relative">
+                      <select
+                        value={reasoningEffort}
+                        onChange={(e) => setReasoningEffort(e.target.value as "high" | "medium" | "low")}
+                        className="glass-subtle rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white/90 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass min-w-[80px] sm:min-w-[100px] pr-6 sm:pr-8"
+                        title="Reasoning Effort"
+                      >
+                        <option value="low" className="bg-gray-800 text-white">Low</option>
+                        <option value="medium" className="bg-gray-800 text-white">Medium</option>
+                        <option value="high" className="bg-gray-800 text-white">High</option>
+                      </select>
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-white/70">
+                        🔽
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-white/90">
+                      <input
+                        type="checkbox"
+                        checked={showReasoning}
+                        onChange={(e) => setShowReasoning(e.target.checked)}
+                        className="rounded"
+                      />
+                      Show
+                    </label>
+                  </>
+                )}
+              </div>
               <label htmlFor="model" className="sr-only">
                 Model
               </label>

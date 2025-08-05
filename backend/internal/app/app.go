@@ -20,6 +20,7 @@ import (
 type captureWriter struct {
 	http.ResponseWriter
 	assistant strings.Builder
+	reasoning strings.Builder
 	seenDelta bool
 }
 
@@ -30,11 +31,17 @@ func (cw *captureWriter) Write(p []byte) (int, error) {
 	if strings.HasPrefix(line, "data:") {
 		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		var obj struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			Reasoning string `json:"reasoning"`
 		}
-		if json.Unmarshal([]byte(payload), &obj) == nil && obj.Content != "" {
-			cw.assistant.WriteString(obj.Content)
-			cw.seenDelta = true
+		if json.Unmarshal([]byte(payload), &obj) == nil {
+			if obj.Content != "" {
+				cw.assistant.WriteString(obj.Content)
+				cw.seenDelta = true
+			}
+			if obj.Reasoning != "" {
+				cw.reasoning.WriteString(obj.Reasoning)
+			}
 		}
 	}
 	// Forward write to the underlying ResponseWriter
@@ -89,9 +96,10 @@ func loadConfig() (*Config, error) {
 
 // In-memory conversation store (basic). This can be replaced by a DB later.
 type ConvMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-	TS      int64  `json:"ts"`
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	Reasoning string `json:"reasoning,omitempty"`
+	TS        int64  `json:"ts"`
 }
 
 type Conversation struct {
@@ -382,11 +390,17 @@ func newRouter(cfg *Config) http.Handler {
 			if strings.HasPrefix(line, "data:") {
 				payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 				var obj struct {
-					Content string `json:"content"`
+					Content   string `json:"content"`
+					Reasoning string `json:"reasoning"`
 				}
-				if json.Unmarshal([]byte(payload), &obj) == nil && obj.Content != "" {
-					cw.assistant.WriteString(obj.Content)
-					cw.seenDelta = true
+				if json.Unmarshal([]byte(payload), &obj) == nil {
+					if obj.Content != "" {
+						cw.assistant.WriteString(obj.Content)
+						cw.seenDelta = true
+					}
+					if obj.Reasoning != "" {
+						cw.reasoning.WriteString(obj.Reasoning)
+					}
 				}
 			}
 		}
@@ -401,8 +415,8 @@ func newRouter(cfg *Config) http.Handler {
 		}
 
 		if err := client.StreamChat(ctx, req, rwShim{ResponseWriter: cw.ResponseWriter, write: wf}); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `stream error`, http.StatusBadGateway)
+			// Don't call http.Error here as headers may already be written during streaming
+			log.Printf("StreamChat error: %v", err)
 			return
 		}
 
@@ -410,9 +424,10 @@ func newRouter(cfg *Config) http.Handler {
 		if cw.seenDelta {
 			now2 := time.Now().UnixMilli()
 			conv.Messages = append(conv.Messages, ConvMessage{
-				Role:    "assistant",
-				Content: cw.assistant.String(),
-				TS:      now2,
+				Role:      "assistant",
+				Content:   cw.assistant.String(),
+				Reasoning: cw.reasoning.String(),
+				TS:        now2,
 			})
 			conv.UpdatedAt = now2
 			store.Upsert(conv)

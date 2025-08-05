@@ -7,6 +7,7 @@ type Message = {
   id: string;
   role: "system" | "user" | "assistant";
   content: string;
+  reasoning?: string;
   createdAt: number;
 };
 
@@ -60,24 +61,55 @@ export function MessageList({ messages }: { messages: Message[] }) {
                   </div>
                 )}
                 {m.role === "assistant" ? (
-                  <ReactMarkdown
-                    className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80"
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeHighlight]}
-                    components={{
-                      a: (props) => (
-                        <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 underline" />
-                      ),
-                      code: (props) => (
-                        <code {...props} className="glass-subtle px-2 py-1 rounded text-blue-200 text-sm" />
-                      ),
-                      pre: (props) => (
-                        <pre {...props} className="glass-dark p-4 rounded-xl overflow-x-auto border border-white/20" />
-                      ),
-                    }}
-                  >
-                    {m.content}
-                  </ReactMarkdown>
+                  <div>
+                    {/* Show reasoning if available */}
+                    {m.reasoning && m.reasoning.trim() && (
+                      <details className="mb-4 glass-subtle rounded-lg border border-white/20">
+                        <summary className="cursor-pointer p-3 text-sm text-white/80 hover:text-white transition-colors">
+                          🧠 Reasoning Process
+                        </summary>
+                        <div className="p-3 pt-0 border-t border-white/10 mt-2">
+                          <ReactMarkdown
+                            className="prose prose-sm prose-invert max-w-none prose-headings:text-white/90 prose-p:text-white/80 prose-strong:text-white/90 prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/70"
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              a: (props) => (
+                                <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 underline" />
+                              ),
+                              code: (props) => (
+                                <code {...props} className="glass-subtle px-2 py-1 rounded text-blue-200 text-sm" />
+                              ),
+                              pre: (props) => (
+                                <pre {...props} className="glass-dark p-4 rounded-xl overflow-x-auto border border-white/20" />
+                              ),
+                            }}
+                          >
+                            {m.reasoning}
+                          </ReactMarkdown>
+                        </div>
+                      </details>
+                    )}
+                    {/* Main content */}
+                    <ReactMarkdown
+                      className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80"
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        a: (props) => (
+                          <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 underline" />
+                        ),
+                        code: (props) => (
+                          <code {...props} className="glass-subtle px-2 py-1 rounded text-blue-200 text-sm" />
+                        ),
+                        pre: (props) => (
+                          <pre {...props} className="glass-dark p-4 rounded-xl overflow-x-auto border border-white/20" />
+                        ),
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
                 ) : (
                   <div className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{m.content}</div>
                 )}

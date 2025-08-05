@@ -1,12 +1,25 @@
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+  reasoning?: string;
+};
+
+type ReasoningConfig = {
+  effort?: "high" | "medium" | "low";
+  max_tokens?: number;
+  exclude?: boolean;
+  enabled?: boolean;
+};
 
 type ChatRequest = {
   model: string;
   messages: ChatMessage[];
+  reasoning?: ReasoningConfig;
 };
 
 type Handlers = {
   onDelta: (cb: (chunk: string) => void) => void;
+  onReasoning: (cb: (chunk: string) => void) => void;
   onError: (cb: (msg: string) => void) => void;
   onDone: (cb: () => void) => void;
 };
@@ -56,11 +69,13 @@ async function streamChatInner(req: ChatRequest, signal?: AbortSignal): Promise<
   if (signal) signal.addEventListener("abort", link, { once: true });
 
   const deltas: Array<(c: string) => void> = [];
+  const reasonings: Array<(c: string) => void> = [];
   const errors: Array<(m: string) => void> = [];
   const dones: Array<() => void> = [];
 
   const handlers: Handlers = {
     onDelta: (cb) => deltas.push(cb),
+    onReasoning: (cb) => reasonings.push(cb),
     onError: (cb) => errors.push(cb),
     onDone: (cb) => dones.push(cb),
   };
@@ -86,6 +101,17 @@ async function streamChatInner(req: ChatRequest, signal?: AbortSignal): Promise<
             const json = JSON.parse(data);
             if (typeof json.content === "string") {
               deltas.forEach((cb) => cb(json.content));
+            }
+          } catch {
+            // ignore
+          }
+          break;
+        }
+        case "reasoning": {
+          try {
+            const json = JSON.parse(data);
+            if (typeof json.reasoning === "string") {
+              reasonings.forEach((cb) => cb(json.reasoning));
             }
           } catch {
             // ignore

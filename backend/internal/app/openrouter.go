@@ -21,13 +21,21 @@ type ChatMessage struct {
 	Content string `json:"content"`
 }
 
+type ReasoningConfig struct {
+	Effort    string `json:"effort,omitempty"`     // "high", "medium", "low"
+	MaxTokens *int   `json:"max_tokens,omitempty"` // Direct token allocation
+	Exclude   *bool  `json:"exclude,omitempty"`    // Exclude reasoning from response
+	Enabled   *bool  `json:"enabled,omitempty"`    // Enable with default params
+}
+
 type ChatRequest struct {
 	// OpenAI-compatible body for OpenRouter
-	Model       string        `json:"model"`
-	Messages    []ChatMessage `json:"messages"`
-	Temperature *float32      `json:"temperature,omitempty"`
-	MaxTokens   *int          `json:"max_tokens,omitempty"`
-	Stream      bool          `json:"stream,omitempty"`
+	Model       string           `json:"model"`
+	Messages    []ChatMessage    `json:"messages"`
+	Temperature *float32         `json:"temperature,omitempty"`
+	MaxTokens   *int             `json:"max_tokens,omitempty"`
+	Stream      bool             `json:"stream,omitempty"`
+	Reasoning   *ReasoningConfig `json:"reasoning,omitempty"`
 
 	// Non-standard/local conveniences (not sent upstream)
 	Conversation  string   `json:"conversation_id,omitempty"`
@@ -45,8 +53,9 @@ type OpenRouterDelta struct {
 	// OpenAI-compatible: choices is an array; each item contains delta with content
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
-			Role    string `json:"role,omitempty"`
+			Content   string `json:"content"`
+			Role      string `json:"role,omitempty"`
+			Reasoning string `json:"reasoning,omitempty"`
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 		Index        int     `json:"index,omitempty"`
@@ -93,17 +102,19 @@ func (c *OpenRouterClient) StreamChat(ctx context.Context, req ChatRequest, w ht
 
 	// Build upstream request body with only OpenAI-compatible fields
 	upstream := struct {
-		Model       string        `json:"model"`
-		Messages    []ChatMessage `json:"messages"`
-		Temperature *float32      `json:"temperature,omitempty"`
-		MaxTokens   *int          `json:"max_tokens,omitempty"`
-		Stream      bool          `json:"stream,omitempty"`
+		Model       string           `json:"model"`
+		Messages    []ChatMessage    `json:"messages"`
+		Temperature *float32         `json:"temperature,omitempty"`
+		MaxTokens   *int             `json:"max_tokens,omitempty"`
+		Stream      bool             `json:"stream,omitempty"`
+		Reasoning   *ReasoningConfig `json:"reasoning,omitempty"`
 	}{
 		Model:       req.Model,
 		Messages:    req.Messages,
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
 		Stream:      true,
+		Reasoning:   req.Reasoning,
 	}
 
 	// If a system prompt was provided, prepend it as a system message
@@ -204,12 +215,15 @@ func (c *OpenRouterClient) StreamChat(ctx context.Context, req ChatRequest, w ht
 				_ = writeEvent("done", `{"reason":"done"}`)
 				return nil
 			}
-			// Parse delta to extract content
+			// Parse delta to extract content and reasoning
 			var delta OpenRouterDelta
 			if err := json.Unmarshal([]byte(payload), &delta); err == nil && len(delta.Choices) > 0 {
 				for _, ch := range delta.Choices {
 					if ch.Delta.Content != "" {
 						_ = writeEvent("delta", jsonEscaped(map[string]string{"content": ch.Delta.Content}))
+					}
+					if ch.Delta.Reasoning != "" {
+						_ = writeEvent("reasoning", jsonEscaped(map[string]string{"reasoning": ch.Delta.Reasoning}))
 					}
 				}
 			} else {
