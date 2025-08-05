@@ -3,3 +3,4 @@
 .env.private
 web/dist
 web/node_modules
+start.sh
