@@ -3,6 +3,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { MathJaxText, MathJaxMarkdown } from "./MathJax";
+import { CodeBlock } from "./CodeBlock";
+import { EnhancedMarkdown } from "./EnhancedMarkdown";
 
 type Message = {
   id: string;
@@ -70,21 +72,49 @@ export function MessageList({ messages }: { messages: Message[] }) {
                           🧠 Reasoning Process
                         </summary>
                         <div className="p-3 pt-0 border-t border-white/10 mt-2">
-                          <MathJaxMarkdown className="prose prose-sm prose-invert max-w-none prose-headings:text-white/90 prose-p:text-white/80 prose-strong:text-white/90 prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/70">
+                          <ReactMarkdown
+                            className="prose prose-sm prose-invert max-w-none prose-headings:text-white/90 prose-p:text-white/80 prose-strong:text-white/90 prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/70"
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              pre: ({ children, ...props }) => {
+                                const codeElement = React.Children.toArray(children).find(
+                                  (child): child is React.ReactElement =>
+                                    React.isValidElement(child) && child.type === 'code'
+                                );
+                                
+                                if (codeElement) {
+                                  return (
+                                    <CodeBlock
+                                      className={codeElement.props.className}
+                                      {...props}
+                                    >
+                                      {codeElement.props.children}
+                                    </CodeBlock>
+                                  );
+                                }
+                                
+                                return <pre {...props}>{children}</pre>;
+                              },
+                              code: ({ className, children, ...props }: any) => {
+                                return <code className={className} {...props}>{children}</code>;
+                              }
+                            }}
+                          >
                             {m.reasoning}
-                          </MathJaxMarkdown>
+                          </ReactMarkdown>
                         </div>
                       </details>
                     )}
                     {/* Main content */}
-                    <MathJaxMarkdown className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80">
+                    <EnhancedMarkdown className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80">
                       {m.content}
-                    </MathJaxMarkdown>
+                    </EnhancedMarkdown>
                   </div>
                 ) : (
-                  <MathJaxText className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">
+                  <EnhancedMarkdown className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80 whitespace-pre-wrap">
                     {m.content}
-                  </MathJaxText>
+                  </EnhancedMarkdown>
                 )}
               </div>
             </li>
