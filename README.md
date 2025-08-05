@@ -6,6 +6,8 @@ A modern, real-time chat application powered by AI models through OpenRouter. GC
 
 - 🤖 **AI-Powered Chat**: Integrates with OpenRouter to access various AI models
 - 🔄 **Real-time Streaming**: Live streaming responses for immediate feedback
+- 🧠 **Reasoning Mode**: Support for reasoning models with token display
+- 📐 **LaTeX Rendering**: Initial support for mathematical expressions (under refinement)
 - 🎨 **Modern UI**: Beautiful glassmorphism design with animated backgrounds
 - 💾 **Persistent Storage**: Conversations saved locally in browser
 - 📤 **Export/Import**: Export conversations as JSON files
@@ -26,6 +28,7 @@ A modern, real-time chat application powered by AI models through OpenRouter. GC
 - **Vite** - Build tool and dev server
 - **Tailwind CSS** - Styling framework
 - **React Markdown** - Markdown rendering with syntax highlighting
+- **MathJax** - LaTeX mathematical expression rendering
 
 ## Prerequisites
 
