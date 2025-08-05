@@ -7,6 +7,7 @@ A modern, real-time chat application powered by AI models through OpenRouter. GC
 - 🤖 **AI-Powered Chat**: Integrates with OpenRouter to access various AI models
 - 🔄 **Real-time Streaming**: Live streaming responses for immediate feedback
 - 🧠 **Reasoning Mode**: Support for reasoning models with token display
+- 🔑 **Flexible API Key Management**: Use server-configured keys or provide your own
 - 📐 **LaTeX Rendering**: Initial support for mathematical expressions (under refinement)
 - 🎨 **Modern UI**: Beautiful glassmorphism design with animated backgrounds
 - 💾 **Persistent Storage**: Conversations saved locally in browser
@@ -37,7 +38,7 @@ Before you begin, ensure you have the following installed:
 - **Go 1.24.2 or later** - [Download Go](https://golang.org/dl/)
 - **Node.js 18 or later** - [Download Node.js](https://nodejs.org/)
 - **npm or yarn** - Package manager (comes with Node.js)
-- **OpenRouter API Key** - [Get your key](https://openrouter.ai/)
+- **OpenRouter API Key** - [Get your key](https://openrouter.ai/) (can be configured server-side or provided by users)
 
 ## Quick Start
 
@@ -78,6 +79,7 @@ VITE_HOST=0.0.0.0
 VITE_PORT=5173
 
 # OpenRouter - Get your key from https://openrouter.ai/
+# OPTIONAL: If not provided, users will be prompted to enter their own API key
 OPENROUTER_API_KEY=sk-or-your-actual-api-key-here
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 ```
@@ -194,10 +196,14 @@ npm run preview  # Preview production build
 
 The backend exposes the following endpoints:
 
+- `GET /api/health` - Health check endpoint
+- `POST /api/validate-key` - Validate an OpenRouter API key
+  - Accepts JSON with `api_key` field
+  - Returns JSON with `valid` boolean and optional `error` message
 - `POST /api/chat` - Stream chat completions
-  - Accepts JSON with `model` and `messages` fields
+  - Accepts JSON with `model`, `messages`, and optional `api_key` fields
   - Returns Server-Sent Events (SSE) stream
-  - Events: `delta` (content chunks), `done` (completion)
+  - Events: `delta` (content chunks), `reasoning` (reasoning chunks), `done` (completion)
 
 ## Building for Production
 
@@ -257,14 +263,14 @@ The frontend proxies API requests at `/api/*` to the backend service via nginx. 
 
 - Tail logs:
 ```bash
-docker compose logs -f backend
-docker compose logs -f frontend
+docker compose logs -f gchat-backend
+docker compose logs -f gchat-frontend
 ```
 
 - Rebuild only one service:
 ```bash
-docker compose build backend
-docker compose up -d backend
+docker compose build gchat-backend
+docker compose up -d gchat-backend
 ```
 
 - Stop and remove:
@@ -288,7 +294,7 @@ docker compose down
     docker compose logs -f frontend
     ```
 - Missing models or chat errors:
-  - Verify `OPENROUTER_API_KEY` is set in the project `.env` or directly under the `backend:` service `environment:` in [docker-compose.yml](docker-compose.yml:1).
+  - Verify `OPENROUTER_API_KEY` is set in the project `.env` or directly under the `gchat-backend:` service `environment:` in [docker-compose.yml](docker-compose.yml:1).
 - CORS:
   - When serving through nginx (frontend service), requests originate from `http://localhost:3000`. The backend defaults are compatible, but you can set `ALLOWED_ORIGIN` as needed.
 
@@ -321,12 +327,19 @@ The backend uses environment variables for configuration. Copy [`backend/.env.ex
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `OPENROUTER_API_KEY` | Your OpenRouter API key from [openrouter.ai](https://openrouter.ai/) | None | **Yes** |
+| `OPENROUTER_API_KEY` | Your OpenRouter API key from [openrouter.ai](https://openrouter.ai/) | None | **No*** |
 | `OPENROUTER_BASE_URL` | OpenRouter API base URL | `https://openrouter.ai/api/v1` | No |
+
+**Note**: If `OPENROUTER_API_KEY` is not provided, users will be prompted to enter their own API key through the web interface. The user-provided key is stored locally in the browser and validated before use.
 
 #### Important Notes
 
-- **OPENROUTER_API_KEY**: This is the only required environment variable. Get your API key from [OpenRouter](https://openrouter.ai/).
+- **OPENROUTER_API_KEY**: This environment variable is now optional. If not provided, users will be prompted to enter their own API key through a secure interface. Get your API key from [OpenRouter](https://openrouter.ai/).
+- **User API Keys**: When users provide their own API keys, they are:
+  - Stored locally in the browser (never sent to your server for storage)
+  - Validated against OpenRouter's API before use
+  - Sent directly to OpenRouter for chat requests
+  - Can be managed through the "🔑 API Key" button in the interface
 - **Network Access**: Set `BACKEND_HOST=0.0.0.0` and `VITE_HOST=0.0.0.0` to allow access from other devices on your network.
 - **CORS**: Use `ALLOWED_ORIGIN=*` for development, but specify exact origins in production for security.
 - **godotenv**: Use `godotenv -f backend/.env` to load environment variables when starting the backend.
