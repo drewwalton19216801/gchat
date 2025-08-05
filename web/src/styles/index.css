@@ -1,3 +1,5 @@
+@import 'highlight.js/styles/monokai-sublime.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -84,4 +86,72 @@ body {
 /* Smooth transitions */
 .transition-glass {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Syntax highlighting for code blocks */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  background: rgba(0, 0, 0, 0.3);
+  color: #f8f8f2;
+  border-radius: 0.5rem;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  color: #f92672;
+}
+
+.hljs-string,
+.hljs-attr {
+  color: #e6db74;
+}
+
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #66d9ef;
+}
+
+.hljs-comment {
+  color: #75715e;
+  font-style: italic;
+}
+
+.hljs-number {
+  color: #ae81ff;
+}
+
+.hljs-built_in,
+.hljs-literal {
+  color: #a6e22e;
+}
+
+/* Custom styles for XML/SVG syntax highlighting */
+pre code.language-xml {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #f8f8f2;
+}
+
+pre code.language-xml .hljs-tag {
+  color: #f92672;
+}
+
+pre code.language-xml .hljs-name {
+  color: #a6e22e;
+}
+
+pre code.language-xml .hljs-attr {
+  color: #fd971f;
+}
+
+pre code.language-xml .hljs-string {
+  color: #e6db74;
 }

@@ -29,7 +29,7 @@ function useLocalStorageState<T>(key: string, initial: T) {
 }
 
 export default function App() {
-  const [model, setModel] = useLocalStorageState("gchat:model", "openrouter/auto");
+  const [model, setModel] = useLocalStorageState("gchat:model", "openrouter/horizon-beta");
   const [systemPrompt, setSystemPrompt] = useLocalStorageState("gchat:sys", "");
   const [messages, setMessages] = useLocalStorageState<Message[]>("gchat:messages", []);
   const [input, setInput] = useState("");
