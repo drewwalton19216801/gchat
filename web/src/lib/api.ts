@@ -15,6 +15,7 @@ type ChatRequest = {
   model: string;
   messages: ChatMessage[];
   reasoning?: ReasoningConfig;
+  api_key?: string;
 };
 
 type Handlers = {
@@ -182,7 +183,38 @@ async function checkHealth(): Promise<{ healthy: boolean; error?: string }> {
   }
 }
 
+async function validateApiKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch("/api/validate-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: apiKey }),
+      signal: AbortSignal.timeout(10000)
+    });
+    
+    if (!response.ok) {
+      return { valid: false, error: `Validation failed (HTTP ${response.status})` };
+    }
+    
+    const data = await response.json();
+    return { valid: data.valid === true, error: data.error };
+  } catch (error: any) {
+    let errorMessage = "Network error";
+    if (error?.name === 'TimeoutError') {
+      errorMessage = "Validation timeout";
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
+    return {
+      valid: false,
+      error: errorMessage
+    };
+  }
+}
+
 export const api = {
   streamChat: streamChatInner,
   checkHealth,
+  validateApiKey,
 };

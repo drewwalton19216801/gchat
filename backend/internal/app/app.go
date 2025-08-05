@@ -210,6 +210,77 @@ func newRouter(cfg *Config) http.Handler {
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
 
+	// API Key validation endpoint
+	r.Post("/api/validate-key", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			APIKey string `json:"api_key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+
+		if req.APIKey == "" {
+			http.Error(w, "api_key is required", http.StatusBadRequest)
+			return
+		}
+
+		// Create a temporary client with the provided API key
+		tempClient := &OpenRouterClient{
+			BaseURL:   getEnv("OPENROUTER_BASE_URL", defaultOpenRouterBase),
+			APIKey:    req.APIKey,
+			AppURL:    cfg.AppURL,
+			AppName:   cfg.AppName,
+			HTTP:      &http.Client{Timeout: 10 * time.Second},
+			UserAgent: "gchat/1.0 (+https://github.com/drewwalton19216801/gchat)",
+		}
+
+		// Test the API key by making a request to OpenRouter's models endpoint
+		testReq, err := http.NewRequestWithContext(r.Context(), http.MethodGet, tempClient.BaseURL+"/models", nil)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"valid":false,"error":"Failed to create request"}`))
+			return
+		}
+
+		testReq.Header.Set("Authorization", "Bearer "+tempClient.APIKey)
+		if tempClient.AppURL != "" {
+			testReq.Header.Set("HTTP-Referer", tempClient.AppURL)
+		}
+		if tempClient.AppName != "" {
+			testReq.Header.Set("X-Title", tempClient.AppName)
+		}
+		if tempClient.UserAgent != "" {
+			testReq.Header.Set("User-Agent", tempClient.UserAgent)
+		}
+
+		resp, err := tempClient.HTTP.Do(testReq)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"valid":false,"error":"Network error"}`))
+			return
+		}
+		defer resp.Body.Close()
+
+		// Drain the response body
+		_, _ = io.Copy(io.Discard, resp.Body)
+
+		if resp.StatusCode == 401 {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"valid":false,"error":"Invalid API key"}`))
+			return
+		}
+
+		if resp.StatusCode/100 != 2 {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"valid":false,"error":"API key validation failed"}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"valid":true}`))
+	})
+
 	// Conversations API (in-memory)
 	// List summaries
 	r.Get("/api/conversations", func(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +391,10 @@ func newRouter(cfg *Config) http.Handler {
 	// Chat SSE endpoint
 	r.Post("/api/chat", func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body
-		var req ChatRequest
+		var req struct {
+			ChatRequest
+			APIKey string `json:"api_key,omitempty"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
@@ -377,6 +451,12 @@ func newRouter(cfg *Config) http.Handler {
 
 		// Proxy stream to OpenRouter and translate to SSE, capturing assistant deltas to append and persist.
 		client := NewOpenRouterClient(cfg)
+
+		// Override API key if provided in request
+		if req.APIKey != "" {
+			client.APIKey = req.APIKey
+		}
+
 		ctx := r.Context()
 
 		// Wrap ResponseWriter to capture SSE deltas by composing a custom writer.
@@ -413,7 +493,7 @@ func newRouter(cfg *Config) http.Handler {
 			return w.Write(p)
 		}
 
-		if err := client.StreamChat(ctx, req, rwShim{ResponseWriter: cw.ResponseWriter, write: wf}); err != nil {
+		if err := client.StreamChat(ctx, req.ChatRequest, rwShim{ResponseWriter: cw.ResponseWriter, write: wf}); err != nil {
 			// Don't call http.Error here as headers may already be written during streaming
 			log.Printf("StreamChat error: %v", err)
 			return

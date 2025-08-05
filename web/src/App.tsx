@@ -4,6 +4,7 @@ import { MessageList } from "./components/MessageList";
 import { Composer } from "./components/Composer";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { HealthStatus } from "./components/HealthStatus";
+import { ApiKeyConfig } from "./components/ApiKeyConfig";
 import { api } from "./lib/api";
 import "./styles/index.css";
 
@@ -41,10 +42,51 @@ export default function App() {
   const [reasoningEnabled, setReasoningEnabled] = useLocalStorageState("gchat:reasoning", false);
   const [reasoningEffort, setReasoningEffort] = useLocalStorageState<"high" | "medium" | "low">("gchat:reasoning-effort", "medium");
   const [showReasoning, setShowReasoning] = useLocalStorageState("gchat:show-reasoning", true);
+  const [userApiKey, setUserApiKey] = useLocalStorageState("gchat:api-key", "");
+  const [showApiKeyConfig, setShowApiKeyConfig] = useState(false);
+  const [apiKeyValidating, setApiKeyValidating] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+  const [serverHasApiKey, setServerHasApiKey] = useState<boolean | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const healthCheckRef = useRef<number | null>(null);
 
-  const canSend = useMemo(() => input.trim().length > 0 && !streaming && isHealthy, [input, streaming, isHealthy]);
+  const canSend = useMemo(() => {
+    const hasApiKey = serverHasApiKey || userApiKey.trim().length > 0;
+    return input.trim().length > 0 && !streaming && isHealthy && hasApiKey;
+  }, [input, streaming, isHealthy, serverHasApiKey, userApiKey]);
+
+  // Check if server has API key configured
+  const checkServerApiKey = async () => {
+    try {
+      // Try to make a test request without providing an API key
+      const testReq = {
+        model: "openrouter/auto",
+        messages: [{ role: "user" as const, content: "test" }],
+      };
+      
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testReq),
+        signal: AbortSignal.timeout(5000)
+      });
+      
+      // If we get a 500 with "missing OPENROUTER_API_KEY", server doesn't have key
+      if (response.status === 500) {
+        const text = await response.text();
+        if (text.includes("missing OPENROUTER_API_KEY")) {
+          setServerHasApiKey(false);
+          return;
+        }
+      }
+      
+      // If we get here, server likely has an API key configured
+      setServerHasApiKey(true);
+    } catch (error) {
+      // Network errors or timeouts - assume server has key for now
+      setServerHasApiKey(true);
+    }
+  };
 
   // Health check function
   const checkBackendHealth = async () => {
@@ -64,10 +106,11 @@ export default function App() {
     }
   };
 
-  // Set up periodic health checks
+  // Set up periodic health checks and check server API key
   useEffect(() => {
-    // Initial health check
+    // Initial health check and API key check
     checkBackendHealth();
+    checkServerApiKey();
 
     // Set up periodic checks - more frequent when unhealthy
     const interval = isHealthy ? 30000 : 10000; // 30s when healthy, 10s when unhealthy
@@ -79,6 +122,36 @@ export default function App() {
       }
     };
   }, [isHealthy]); // Re-run when health status changes
+
+  // Show API key config if server doesn't have key and user hasn't provided one
+  useEffect(() => {
+    if (serverHasApiKey === false && !userApiKey.trim()) {
+      setShowApiKeyConfig(true);
+    } else {
+      setShowApiKeyConfig(false);
+    }
+  }, [serverHasApiKey, userApiKey]);
+
+  // Handle API key submission
+  const handleApiKeySubmit = async (apiKey: string) => {
+    setApiKeyValidating(true);
+    setApiKeyError(null);
+    
+    try {
+      const result = await api.validateApiKey(apiKey);
+      if (result.valid) {
+        setUserApiKey(apiKey);
+        setShowApiKeyConfig(false);
+        setApiKeyError(null);
+      } else {
+        setApiKeyError(result.error || "Invalid API key");
+      }
+    } catch (error: any) {
+      setApiKeyError(error?.message || "Failed to validate API key");
+    } finally {
+      setApiKeyValidating(false);
+    }
+  };
 
   // Also check health when network errors occur during chat
   const handleNetworkError = (errorMessage: string) => {
@@ -131,6 +204,7 @@ export default function App() {
         model: string;
         messages: { role: "system" | "user" | "assistant"; content: string }[];
         reasoning?: { effort?: "high" | "medium" | "low"; exclude?: boolean };
+        api_key?: string;
       } = {
         model,
         messages: [
@@ -145,6 +219,11 @@ export default function App() {
           effort: reasoningEffort,
           exclude: !showReasoning,
         };
+      }
+
+      // Add user API key if server doesn't have one
+      if (!serverHasApiKey && userApiKey.trim()) {
+        req.api_key = userApiKey.trim();
       }
 
       const { onDelta, onReasoning, onError, onDone } = await api.streamChat(req, ac.signal);
@@ -208,6 +287,15 @@ export default function App() {
 
   return (
     <div className="min-h-dvh relative">
+      {/* API Key Configuration Modal */}
+      {showApiKeyConfig && (
+        <ApiKeyConfig
+          onApiKeySubmit={handleApiKeySubmit}
+          isLoading={apiKeyValidating}
+          error={apiKeyError || undefined}
+        />
+      )}
+
       {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full blur-3xl float-animation"></div>
@@ -254,6 +342,16 @@ export default function App() {
               >
                 🗑️ Clear
               </button>
+              {serverHasApiKey === false && (
+                <button
+                  className="glass-subtle rounded-lg px-2 py-1.5 text-xs text-white/90 hover:text-white transition-glass glow-hover flex-1 max-w-[120px]"
+                  onClick={() => setShowApiKeyConfig(true)}
+                  aria-label="Configure API Key"
+                  title="Configure API Key"
+                >
+                  🔑 Key
+                </button>
+              )}
             </div>
             {/* Reasoning controls for mobile */}
             <div className="flex items-center gap-2 justify-center">
@@ -364,6 +462,16 @@ export default function App() {
               >
                 🗑️ Clear
               </button>
+              {serverHasApiKey === false && (
+                <button
+                  className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
+                  onClick={() => setShowApiKeyConfig(true)}
+                  aria-label="Configure API Key"
+                  title="Configure API Key"
+                >
+                  🔑 API Key
+                </button>
+              )}
             </div>
           </div>
         </div>
