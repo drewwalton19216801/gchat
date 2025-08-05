@@ -7,6 +7,31 @@ type Props = {
 
 type Model = { id: string; name: string };
 
+// Helper function to extract provider from model ID
+function getProvider(modelId: string): string {
+  const parts = modelId.split('/');
+  if (parts.length > 1) {
+    return parts[0];
+  }
+  return 'Other';
+}
+
+// Helper function to sort models by provider, then by name
+function sortModels(models: Model[]): Model[] {
+  return models.sort((a, b) => {
+    const providerA = getProvider(a.id);
+    const providerB = getProvider(b.id);
+    
+    // First sort by provider
+    if (providerA !== providerB) {
+      return providerA.localeCompare(providerB);
+    }
+    
+    // Then sort by name within the same provider
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export function ModelSelector({ value, onChange }: Props) {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(false);
@@ -17,7 +42,10 @@ export function ModelSelector({ value, onChange }: Props) {
     fetch("/api/models")
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled) setModels(data.models || []);
+        if (!cancelled) {
+          const models = data.models || [];
+          setModels(sortModels(models));
+        }
       })
       .catch(() => {})
       .finally(() => {
