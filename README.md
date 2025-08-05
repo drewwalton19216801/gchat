@@ -217,6 +217,81 @@ npm run build
 
 The built files will be in the `web/dist` directory.
 
+## Docker
+
+This repo includes production-ready Dockerfiles for the backend (Go) and frontend (Vite/React served by nginx), plus a docker-compose configuration.
+
+### Prerequisites
+- Docker and Docker Compose installed
+- Optional: An OpenRouter API key for live model calls
+
+### Quick start
+
+1) (Optional) Create a project-level `.env` to pass secrets into the backend:
+```dotenv
+# .env (project root)
+OPENROUTER_API_KEY=your-openrouter-api-key
+
+# Optional overrides
+# ALLOWED_ORIGIN=http://localhost:3000
+# APP_URL=http://localhost:3000
+# DEFAULT_MODEL=openrouter/auto
+# PORT=8080
+# BACKEND_HOST=0.0.0.0
+```
+
+2) Build images and start services:
+```bash
+docker compose build
+docker compose up -d
+```
+
+3) Access the app:
+- Frontend: http://localhost:3000
+- Backend:  http://localhost:8080
+  - Health: http://localhost:8080/api/health
+
+The frontend proxies API requests at `/api/*` to the backend service via nginx. See [nginx.conf](web/nginx.conf:1) for proxy details.
+
+### Useful commands
+
+- Tail logs:
+```bash
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+- Rebuild only one service:
+```bash
+docker compose build backend
+docker compose up -d backend
+```
+
+- Stop and remove:
+```bash
+docker compose down
+```
+
+### Images and configuration
+
+- Backend image: built from [Dockerfile](backend/Dockerfile:1). Multi-stage build produces a minimal distroless runtime. The server listens on `0.0.0.0:8080` by default inside the container.
+- Frontend image: built from [Dockerfile](web/Dockerfile:1). Multi-stage build compiles the Vite app and serves it via nginx with SPA fallback. nginx proxy is configured in [nginx.conf](web/nginx.conf:1).
+
+### Troubleshooting
+
+- 502 from frontend when calling `/api/*`:
+  - Ensure the backend is listening on `0.0.0.0:8080` (default in code).
+  - Rebuild and restart after changes: `docker compose build` then `docker compose up -d`.
+  - Check logs for errors:
+    ```bash
+    docker compose logs -f backend
+    docker compose logs -f frontend
+    ```
+- Missing models or chat errors:
+  - Verify `OPENROUTER_API_KEY` is set in the project `.env` or directly under the `backend:` service `environment:` in [docker-compose.yml](docker-compose.yml:1).
+- CORS:
+  - When serving through nginx (frontend service), requests originate from `http://localhost:3000`. The backend defaults are compatible, but you can set `ALLOWED_ORIGIN` as needed.
+
 ## Configuration
 
 ### Environment Variables

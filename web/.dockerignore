@@ -1,0 +1,19 @@
+# Ignore files not needed for building the frontend
+**/.git
+**/.gitignore
+**/.DS_Store
+**/.vscode
+**/.idea
+**/.cache
+**/coverage
+**/dist
+**/build
+**/node_modules
+**/*.swp
+**/*.swo
+**/*~
+
+# Keep only web sources when building from repo root
+!/web/**
+!/package.json
+!/package-lock.json

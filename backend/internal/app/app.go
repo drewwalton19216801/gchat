@@ -73,11 +73,10 @@ type Config struct {
 
 func loadConfig() (*Config, error) {
 	viteHost := getEnv("VITE_HOST", "localhost")
-	backendHost := getEnv("BACKEND_HOST", "localhost")
+	backendHost := getEnv("BACKEND_HOST", "")
 
-	// If VITE_HOST is 0.0.0.0 and BACKEND_HOST is not explicitly set,
-	// set backend to listen on all interfaces too
-	if viteHost == "0.0.0.0" && getEnv("BACKEND_HOST", "") == "" {
+	// Default: bind to all interfaces in containers unless explicitly set
+	if backendHost == "" {
 		backendHost = "0.0.0.0"
 	}
 

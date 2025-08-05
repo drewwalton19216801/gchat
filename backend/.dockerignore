@@ -1,0 +1,24 @@
+# Exclude everything not needed for building the Go binary
+**/.git
+**/.gitignore
+**/.DS_Store
+**/node_modules
+**/dist
+**/.vscode
+**/.idea
+**/.env.local
+**/.envrc
+**/.cache
+**/coverage
+
+# Go build caches and editor artifacts
+**/*.swp
+**/*.swo
+**/*~
+**/.env
+**/.env.*
+
+# Keep only backend sources relevant to build context when building from repo root
+!/backend/**
+!/go.mod
+!/go.sum
