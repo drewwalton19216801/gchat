@@ -6,6 +6,27 @@ interface CodeBlockProps {
   language?: string;
 }
 
+// Normalize language aliases to ensure consistent labeling (e.g., golang -> go)
+function normalizeLanguage(lang?: string | null): string | undefined {
+  if (!lang) return undefined;
+  const l = String(lang).toLowerCase();
+  const map: Record<string, string> = {
+    golang: 'go',
+    'go-lang': 'go',
+    go: 'go',
+    jsx: 'javascript',
+    tsx: 'typescript',
+    sh: 'bash',
+    shell: 'bash',
+    zsh: 'bash',
+    py: 'python',
+    js: 'javascript',
+    ts: 'typescript',
+    yml: 'yaml',
+  };
+  return map[l] || l;
+}
+
 export function CodeBlock({ children, className, language }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   
@@ -23,8 +44,8 @@ export function CodeBlock({ children, className, language }: CodeBlockProps) {
     return '';
   };
 
-  const codeContent = getCodeContent(children);
-
+  // Trim trailing whitespace/newlines for a cleaner copy
+  const codeContent = getCodeContent(children).replace(/\s+$/,'');
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(codeContent);
@@ -36,7 +57,8 @@ export function CodeBlock({ children, className, language }: CodeBlockProps) {
   };
 
   // Extract language from className (format: language-xxx)
-  const detectedLanguage = className?.match(/language-(\w+)/)?.[1] || language;
+  const classLangMatch = className?.match(/(?:^|\s)language-([a-zA-Z0-9_-]+)/)?.[1];
+  const detectedLanguage = normalizeLanguage(classLangMatch || language);
 
   return (
     <div className="relative group">
