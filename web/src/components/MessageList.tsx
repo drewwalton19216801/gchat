@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { MathJaxText, MathJaxMarkdown } from "./MathJax";
 
 type Message = {
   id: string;
@@ -69,49 +70,21 @@ export function MessageList({ messages }: { messages: Message[] }) {
                           🧠 Reasoning Process
                         </summary>
                         <div className="p-3 pt-0 border-t border-white/10 mt-2">
-                          <ReactMarkdown
-                            className="prose prose-sm prose-invert max-w-none prose-headings:text-white/90 prose-p:text-white/80 prose-strong:text-white/90 prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/70"
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                            components={{
-                              a: (props) => (
-                                <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 underline" />
-                              ),
-                              code: (props) => (
-                                <code {...props} className="glass-subtle px-2 py-1 rounded text-blue-200 text-sm" />
-                              ),
-                              pre: (props) => (
-                                <pre {...props} className="glass-dark p-4 rounded-xl overflow-x-auto border border-white/20" />
-                              ),
-                            }}
-                          >
+                          <MathJaxMarkdown className="prose prose-sm prose-invert max-w-none prose-headings:text-white/90 prose-p:text-white/80 prose-strong:text-white/90 prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/70">
                             {m.reasoning}
-                          </ReactMarkdown>
+                          </MathJaxMarkdown>
                         </div>
                       </details>
                     )}
                     {/* Main content */}
-                    <ReactMarkdown
-                      className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80"
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                      components={{
-                        a: (props) => (
-                          <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 underline" />
-                        ),
-                        code: (props) => (
-                          <code {...props} className="glass-subtle px-2 py-1 rounded text-blue-200 text-sm" />
-                        ),
-                        pre: (props) => (
-                          <pre {...props} className="glass-dark p-4 rounded-xl overflow-x-auto border border-white/20" />
-                        ),
-                      }}
-                    >
+                    <MathJaxMarkdown className="prose prose-sm sm:prose-base prose-invert max-w-none prose-headings:text-white prose-p:text-white/90 prose-strong:text-white prose-code:text-blue-200 prose-pre:glass-dark prose-pre:border prose-pre:border-white/20 prose-blockquote:border-white/30 prose-blockquote:text-white/80">
                       {m.content}
-                    </ReactMarkdown>
+                    </MathJaxMarkdown>
                   </div>
                 ) : (
-                  <div className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{m.content}</div>
+                  <MathJaxText className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">
+                    {m.content}
+                  </MathJaxText>
                 )}
               </div>
             </li>
