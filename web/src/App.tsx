@@ -353,7 +353,7 @@ export default function App() {
         className="glass sticky top-0 z-40 border-b border-white/20"
         role="banner"
       >
-        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+        <div className="max-w-[80vw] sm:max-w-[80vw] lg:max-w-[80vw] xl:max-w-[80vw] 2xl:max-w-[80vw] mx-auto px-3 sm:px-4 py-3 sm:py-4">
           {/* Mobile layout: stacked */}
           <div className="flex flex-col gap-3 sm:hidden">
             <div className="flex items-center justify-between">
@@ -519,7 +519,7 @@ export default function App() {
 
       {error && <ErrorBanner message={error} onClose={handleErrorClose} />}
 
-      <main className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-8 relative z-10" role="main">
+      <main className="max-w-[80vw] sm:max-w-[80vw] lg:max-w-[80vw] xl:max-w-[80vw] 2xl:max-w-[80vw] mx-auto px-3 sm:px-4 py-6 sm:py-8 relative z-10" role="main">
         <HealthStatus
           isHealthy={isHealthy}
           error={healthError}
@@ -549,7 +549,7 @@ export default function App() {
         className="sticky bottom-0 w-full glass border-t border-white/20 relative z-10"
         role="contentinfo"
       >
-        <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <div className="max-w-[80vw] sm:max-w-[80vw] lg:max-w-[80vw] xl:max-w-[80vw] 2xl:max-w-[80vw] mx-auto px-3 sm:px-4 py-4 sm:py-6">
           <Composer
             value={input}
             onChange={handleInputChange}
