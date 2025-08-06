@@ -327,6 +327,18 @@ export default function App() {
 
   return (
     <div className="min-h-dvh relative">
+      {/* GitHub banner */}
+      <div className="github-banner" aria-hidden="true">
+        <a
+          href="https://github.com/drewwalton19216801/gchat"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View source on GitHub: drewwalton19216801/gchat"
+          title="View on GitHub"
+        >
+          View on GitHub
+        </a>
+      </div>
       {/* API Key Configuration Modal */}
       {showApiKeyConfig && (
         <ApiKeyConfig
