@@ -15,7 +15,6 @@ html, body, #root {
 
 body {
   margin: 0;
-  font-smooth: always;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
