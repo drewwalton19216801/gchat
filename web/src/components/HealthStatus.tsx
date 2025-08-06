@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 
 interface HealthStatusProps {
   isHealthy: boolean;
@@ -6,7 +6,7 @@ interface HealthStatusProps {
   isChecking?: boolean;
 }
 
-export function HealthStatus({ isHealthy, error, isChecking }: HealthStatusProps) {
+export const HealthStatus = memo(function HealthStatus({ isHealthy, error, isChecking }: HealthStatusProps) {
   if (isChecking) {
     return (
       <div className="glass border border-yellow-400/30 rounded-lg p-3 mb-4">
@@ -38,4 +38,4 @@ export function HealthStatus({ isHealthy, error, isChecking }: HealthStatusProps
   }
 
   return null; // Don't show anything when healthy
-}
+});

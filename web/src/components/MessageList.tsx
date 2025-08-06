@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -14,7 +14,7 @@ type Message = {
   createdAt: number;
 };
 
-export function MessageList({ messages }: { messages: Message[] }) {
+export const MessageList = memo(function MessageList({ messages }: { messages: Message[] }) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -124,4 +124,4 @@ export function MessageList({ messages }: { messages: Message[] }) {
       </ul>
     </section>
   );
-}
+});

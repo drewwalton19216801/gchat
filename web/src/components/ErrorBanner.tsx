@@ -1,6 +1,6 @@
-import React from "react";
+import React, { memo } from "react";
 
-export function ErrorBanner({ message, onClose }: { message: string; onClose: () => void }) {
+export const ErrorBanner = memo(function ErrorBanner({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-3 relative z-20">
       <div className="flex items-start gap-4 rounded-2xl glass-dark border border-red-400/30 p-4 text-red-200 shadow-lg">
@@ -21,4 +21,4 @@ export function ErrorBanner({ message, onClose }: { message: string; onClose: ()
       </div>
     </div>
   );
-}
+});

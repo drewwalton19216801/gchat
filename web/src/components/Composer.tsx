@@ -1,4 +1,4 @@
-import React, { KeyboardEvent } from "react";
+import React, { KeyboardEvent, memo } from "react";
 import { clsx } from "clsx";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
   isHealthy?: boolean;
 };
 
-export function Composer({ value, onChange, onSend, onStop, disabled, canSend, isHealthy = true }: Props) {
+export const Composer = memo(function Composer({ value, onChange, onSend, onStop, disabled, canSend, isHealthy = true }: Props) {
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -72,4 +72,4 @@ export function Composer({ value, onChange, onSend, onStop, disabled, canSend, i
       </div>
     </div>
   );
-}
+});

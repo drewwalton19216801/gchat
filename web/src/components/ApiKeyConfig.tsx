@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 
 interface ApiKeyConfigProps {
   onApiKeySubmit: (apiKey: string) => void;
@@ -6,7 +6,7 @@ interface ApiKeyConfigProps {
   error?: string;
 }
 
-export function ApiKeyConfig({ onApiKeySubmit, isLoading = false, error }: ApiKeyConfigProps) {
+export const ApiKeyConfig = memo(function ApiKeyConfig({ onApiKeySubmit, isLoading = false, error }: ApiKeyConfigProps) {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
@@ -109,4 +109,4 @@ export function ApiKeyConfig({ onApiKeySubmit, isLoading = false, error }: ApiKe
       </div>
     </div>
   );
-}
+});

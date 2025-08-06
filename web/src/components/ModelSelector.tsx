@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 
 type Props = {
   value: string;
@@ -32,7 +32,7 @@ function sortModels(models: Model[]): Model[] {
   });
 }
 
-export function ModelSelector({ value, onChange }: Props) {
+export const ModelSelector = memo(function ModelSelector({ value, onChange }: Props) {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -82,4 +82,4 @@ export function ModelSelector({ value, onChange }: Props) {
       </div>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { ModelSelector } from "./components/ModelSelector";
 import { MessageList } from "./components/MessageList";
 import { Composer } from "./components/Composer";
@@ -56,7 +56,7 @@ export default function App() {
   }, [input, streaming, isHealthy, serverHasApiKey, userApiKey]);
 
   // Check if server has API key configured
-  const checkServerApiKey = async () => {
+  const checkServerApiKey = useCallback(async () => {
     try {
       // Try to make a test request without providing an API key
       const testReq = {
@@ -86,10 +86,10 @@ export default function App() {
       // Network errors or timeouts - assume server has key for now
       setServerHasApiKey(true);
     }
-  };
+  }, []);
 
   // Health check function
-  const checkBackendHealth = async () => {
+  const checkBackendHealth = useCallback(async () => {
     setIsCheckingHealth(true);
     console.log("Starting health check...");
     try {
@@ -104,7 +104,7 @@ export default function App() {
     } finally {
       setIsCheckingHealth(false);
     }
-  };
+  }, []);
 
   // Set up periodic health checks and check server API key
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function App() {
         clearInterval(healthCheckRef.current);
       }
     };
-  }, [isHealthy]); // Re-run when health status changes
+  }, [isHealthy, checkBackendHealth, checkServerApiKey]); // Re-run when health status changes
 
   // Show API key config if server doesn't have key and user hasn't provided one
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function App() {
   }, [serverHasApiKey, userApiKey]);
 
   // Handle API key submission
-  const handleApiKeySubmit = async (apiKey: string) => {
+  const handleApiKeySubmit = useCallback(async (apiKey: string) => {
     setApiKeyValidating(true);
     setApiKeyError(null);
     
@@ -151,10 +151,10 @@ export default function App() {
     } finally {
       setApiKeyValidating(false);
     }
-  };
+  }, []);
 
   // Also check health when network errors occur during chat
-  const handleNetworkError = (errorMessage: string) => {
+  const handleNetworkError = useCallback((errorMessage: string) => {
     setError(errorMessage);
     // Trigger immediate health check if it looks like a network error
     if (errorMessage.toLowerCase().includes('network') ||
@@ -162,9 +162,9 @@ export default function App() {
         errorMessage.toLowerCase().includes('failed')) {
       checkBackendHealth();
     }
-  };
+  }, [checkBackendHealth]);
 
-  const onSend = async () => {
+  const onSend = useCallback(async () => {
     if (!canSend) return;
     setError(null);
 
@@ -259,21 +259,21 @@ export default function App() {
       setStreaming(false);
       abortRef.current = null;
     }
-  };
+  }, [canSend, input, messages, model, systemPrompt, reasoningEnabled, reasoningEffort, showReasoning, serverHasApiKey, userApiKey, isHealthy, handleNetworkError]);
 
-  const onStop = () => {
+  const onStop = useCallback(() => {
     abortRef.current?.abort();
     setStreaming(false);
     abortRef.current = null;
-  };
+  }, []);
 
-  const onClear = () => {
+  const onClear = useCallback(() => {
     setMessages([]);
     setError(null);
     setInput("");
-  };
+  }, []);
 
-  const onExport = () => {
+  const onExport = useCallback(() => {
     const blob = new Blob([JSON.stringify({ model, systemPrompt, messages }, null, 2)], {
       type: "application/json",
     });
@@ -283,7 +283,47 @@ export default function App() {
     a.download = "gchat-conversation.json";
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [model, systemPrompt, messages]);
+
+  // Memoize handlers for child components
+  const handleModelChange = useCallback((value: string) => {
+    setModel(value);
+  }, [setModel]);
+
+  const handleSystemPromptChange = useCallback((value: string) => {
+    setSystemPrompt(value);
+  }, [setSystemPrompt]);
+
+  const handleInputChange = useCallback((value: string) => {
+    setInput(value);
+  }, []);
+
+  const handleErrorClose = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const handleShowApiKeyConfig = useCallback(() => {
+    setShowApiKeyConfig(true);
+  }, []);
+
+  const handleReasoningEnabledChange = useCallback((enabled: boolean) => {
+    setReasoningEnabled(enabled);
+  }, [setReasoningEnabled]);
+
+  const handleReasoningEffortChange = useCallback((effort: "high" | "medium" | "low") => {
+    setReasoningEffort(effort);
+  }, [setReasoningEffort]);
+
+  const handleShowReasoningChange = useCallback((show: boolean) => {
+    setShowReasoning(show);
+  }, [setShowReasoning]);
+
+  const handleDefaultSystemPrompt = useCallback(() => {
+    setSystemPrompt(
+      systemPrompt ||
+        "You are GChat, a concise and accurate assistant. Respond with helpful structure."
+    );
+  }, [systemPrompt, setSystemPrompt]);
 
   return (
     <div className="min-h-dvh relative">
@@ -323,7 +363,7 @@ export default function App() {
               <label htmlFor="model" className="sr-only">
                 Model
               </label>
-              <ModelSelector value={model} onChange={setModel} />
+              <ModelSelector value={model} onChange={handleModelChange} />
             </div>
             <div className="flex items-center gap-2 justify-center">
               <button
@@ -345,7 +385,7 @@ export default function App() {
               {serverHasApiKey === false && (
                 <button
                   className="glass-subtle rounded-lg px-2 py-1.5 text-xs text-white/90 hover:text-white transition-glass glow-hover flex-1 max-w-[120px]"
-                  onClick={() => setShowApiKeyConfig(true)}
+                  onClick={handleShowApiKeyConfig}
                   aria-label="Configure API Key"
                   title="Configure API Key"
                 >
@@ -359,7 +399,7 @@ export default function App() {
                 <input
                   type="checkbox"
                   checked={reasoningEnabled}
-                  onChange={(e) => setReasoningEnabled(e.target.checked)}
+                  onChange={(e) => handleReasoningEnabledChange(e.target.checked)}
                   className="rounded"
                 />
                 🧠 Reasoning
@@ -369,7 +409,7 @@ export default function App() {
                   <div className="relative">
                     <select
                       value={reasoningEffort}
-                      onChange={(e) => setReasoningEffort(e.target.value as "high" | "medium" | "low")}
+                      onChange={(e) => handleReasoningEffortChange(e.target.value as "high" | "medium" | "low")}
                       className="glass-subtle rounded-lg px-2 py-1.5 text-xs text-white/90 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass min-w-[80px] pr-6"
                       title="Reasoning Effort"
                     >
@@ -385,7 +425,7 @@ export default function App() {
                     <input
                       type="checkbox"
                       checked={showReasoning}
-                      onChange={(e) => setShowReasoning(e.target.checked)}
+                      onChange={(e) => handleShowReasoningChange(e.target.checked)}
                       className="rounded"
                     />
                     Show
@@ -408,7 +448,7 @@ export default function App() {
                   <input
                     type="checkbox"
                     checked={reasoningEnabled}
-                    onChange={(e) => setReasoningEnabled(e.target.checked)}
+                    onChange={(e) => handleReasoningEnabledChange(e.target.checked)}
                     className="rounded"
                   />
                   🧠 Reasoning
@@ -418,7 +458,7 @@ export default function App() {
                     <div className="relative">
                       <select
                         value={reasoningEffort}
-                        onChange={(e) => setReasoningEffort(e.target.value as "high" | "medium" | "low")}
+                        onChange={(e) => handleReasoningEffortChange(e.target.value as "high" | "medium" | "low")}
                         className="glass-subtle rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white/90 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass min-w-[80px] sm:min-w-[100px] pr-6 sm:pr-8"
                         title="Reasoning Effort"
                       >
@@ -434,7 +474,7 @@ export default function App() {
                       <input
                         type="checkbox"
                         checked={showReasoning}
-                        onChange={(e) => setShowReasoning(e.target.checked)}
+                        onChange={(e) => handleShowReasoningChange(e.target.checked)}
                         className="rounded"
                       />
                       Show
@@ -445,7 +485,7 @@ export default function App() {
               <label htmlFor="model" className="sr-only">
                 Model
               </label>
-              <ModelSelector value={model} onChange={setModel} />
+              <ModelSelector value={model} onChange={handleModelChange} />
               <button
                 className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
                 onClick={onExport}
@@ -465,7 +505,7 @@ export default function App() {
               {serverHasApiKey === false && (
                 <button
                   className="glass-subtle rounded-lg px-3 py-2 text-xs sm:text-sm text-white/90 hover:text-white transition-glass glow-hover"
-                  onClick={() => setShowApiKeyConfig(true)}
+                  onClick={handleShowApiKeyConfig}
                   aria-label="Configure API Key"
                   title="Configure API Key"
                 >
@@ -477,7 +517,7 @@ export default function App() {
         </div>
       </header>
 
-      {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
+      {error && <ErrorBanner message={error} onClose={handleErrorClose} />}
 
       <main className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-8 relative z-10" role="main">
         <HealthStatus
@@ -494,7 +534,7 @@ export default function App() {
             className="w-full rounded-xl glass p-4 text-sm text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 focus:glass-strong transition-glass resize-none"
             rows={2}
             value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
+            onChange={(e) => handleSystemPromptChange(e.target.value)}
             placeholder="You are a helpful assistant..."
             aria-describedby="system-prompt-help"
           />
@@ -512,10 +552,10 @@ export default function App() {
         <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           <Composer
             value={input}
-            onChange={setInput}
+            onChange={handleInputChange}
             onSend={onSend}
-            disabled={streaming || !isHealthy}
             onStop={onStop}
+            disabled={streaming || !isHealthy}
             canSend={canSend}
             isHealthy={isHealthy}
           />
@@ -524,12 +564,7 @@ export default function App() {
               Press Enter to send, Shift+Enter for newline.{" "}
               <button
                 className="underline underline-offset-2 hover:text-white/90 transition-colors"
-                onClick={() =>
-                  setSystemPrompt(
-                    systemPrompt ||
-                      "You are GChat, a concise and accurate assistant. Respond with helpful structure."
-                  )
-                }
+                onClick={handleDefaultSystemPrompt}
               >
                 Use default system prompt
               </button>
