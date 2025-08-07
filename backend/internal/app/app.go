@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/drewwalton19216801/gchat/backend/internal/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
@@ -390,18 +391,24 @@ func newRouter(cfg *Config) http.Handler {
 
 	// Chat SSE endpoint
 	r.Post("/api/chat", func(w http.ResponseWriter, r *http.Request) {
+		logger.Debug("/api/chat request received from %s", r.RemoteAddr)
+
 		// Parse request body
 		var req struct {
 			ChatRequest
 			APIKey string `json:"api_key,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			logger.Error("/api/chat failed to decode request body: %v", err)
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
 		if req.Model == "" {
 			req.Model = cfg.DefaultModel
 		}
+
+		logger.Debug("/api/chat parsed request - Model: %s, Messages: %d, APIKey provided: %t",
+			req.Model, len(req.Messages), req.APIKey != "")
 
 		// Basic conversation handling (server-side memory + local JSON persistence)
 		convID := r.URL.Query().Get("conversationId")
@@ -452,8 +459,11 @@ func newRouter(cfg *Config) http.Handler {
 		// Proxy stream to OpenRouter and translate to SSE, capturing assistant deltas to append and persist.
 		client := NewOpenRouterClient(cfg)
 
+		logger.Debug("/api/chat created OpenRouter client - Server APIKey present: %t", client.APIKey != "")
+
 		// Override API key if provided in request
 		if req.APIKey != "" {
+			logger.Debug("/api/chat using user-provided API key")
 			client.APIKey = req.APIKey
 		}
 
@@ -493,14 +503,22 @@ func newRouter(cfg *Config) http.Handler {
 			return w.Write(p)
 		}
 
+		logger.Debug("/api/chat calling StreamChat")
 		if err := client.StreamChat(ctx, req.ChatRequest, rwShim{ResponseWriter: cw.ResponseWriter, write: wf}); err != nil {
 			// Don't call http.Error here as headers may already be written during streaming
-			log.Printf("StreamChat error: %v", err)
+			logger.Error("/api/chat StreamChat error: %v", err)
+
+			// If headers haven't been written yet, we can still send an error response
+			if !cw.seenDelta {
+				logger.Debug("/api/chat headers not yet written, sending 500 error response")
+				http.Error(w, "chat processing failed", http.StatusInternalServerError)
+			}
 			return
 		}
 
 		// After stream ends, if we saw content, append assistant message and persist
 		if cw.seenDelta {
+			logger.Debug("/api/chat stream completed successfully, saving assistant response")
 			now2 := time.Now().UnixMilli()
 			conv.Messages = append(conv.Messages, ConvMessage{
 				Role:      "assistant",
@@ -511,6 +529,8 @@ func newRouter(cfg *Config) http.Handler {
 			conv.UpdatedAt = now2
 			store.Upsert(conv)
 			_ = store.SaveToFile(".gchat-conversations.json")
+		} else {
+			logger.Debug("/api/chat stream completed but no content received")
 		}
 	})
 

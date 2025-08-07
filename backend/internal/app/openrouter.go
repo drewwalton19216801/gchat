@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/drewwalton19216801/gchat/backend/internal/logger"
 )
 
 const (
@@ -92,7 +94,11 @@ func NewOpenRouterClient(cfg *Config) *OpenRouterClient {
 // StreamChat proxies a streaming chat completion from OpenRouter and writes SSE to w.
 // The context should be canceled to stop streaming.
 func (c *OpenRouterClient) StreamChat(ctx context.Context, req ChatRequest, w http.ResponseWriter) error {
+	logger.Debug("StreamChat called - Model: %s, Messages: %d, APIKey present: %t",
+		req.Model, len(req.Messages), c.APIKey != "")
+
 	if c.APIKey == "" {
+		logger.Error("StreamChat failed: missing OPENROUTER_API_KEY")
 		http.Error(w, "server not configured: missing OPENROUTER_API_KEY", http.StatusInternalServerError)
 		return errors.New("missing OPENROUTER_API_KEY")
 	}
@@ -124,10 +130,15 @@ func (c *OpenRouterClient) StreamChat(ctx context.Context, req ChatRequest, w ht
 
 	bodyBytes, err := json.Marshal(upstream)
 	if err != nil {
+		logger.Error("StreamChat failed to marshal request: %v", err)
 		return err
 	}
+
+	logger.Debug("StreamChat request body: %s", string(bodyBytes))
+
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/chat/completions", strings.NewReader(string(bodyBytes)))
 	if err != nil {
+		logger.Error("StreamChat failed to create HTTP request: %v", err)
 		return err
 	}
 
@@ -145,14 +156,22 @@ func (c *OpenRouterClient) StreamChat(ctx context.Context, req ChatRequest, w ht
 	}
 
 	// Execute
+	logger.Debug("StreamChat making request to OpenRouter: %s", c.BaseURL+"/chat/completions")
 	resp, err := c.HTTP.Do(httpReq)
 	if err != nil {
+		logger.Error("StreamChat HTTP request failed: %v", err)
+		http.Error(w, "network error", http.StatusInternalServerError)
 		return err
 	}
 	defer resp.Body.Close()
 
+	logger.Debug("StreamChat OpenRouter response status: %d %s", resp.StatusCode, resp.Status)
+
 	if resp.StatusCode/100 != 2 {
-		io.Copy(io.Discard, resp.Body)
+		// Read error response body for logging
+		errorBody, _ := io.ReadAll(resp.Body)
+		logger.Error("StreamChat OpenRouter error response (status %d): %s", resp.StatusCode, string(errorBody))
+
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return errors.New("openrouter upstream error: " + resp.Status)
 	}
@@ -195,9 +214,11 @@ func (c *OpenRouterClient) StreamChat(ctx context.Context, req ChatRequest, w ht
 			line, err := reader.ReadString('\n')
 			if err != nil {
 				if errors.Is(err, io.EOF) {
+					logger.Debug("StreamChat reached EOF, ending stream")
 					_ = writeEvent("done", `{"reason":"eof"}`)
 					return nil
 				}
+				logger.Error("StreamChat error reading from OpenRouter stream: %v", err)
 				return err
 			}
 			// Expect lines like "data: {...}" or "data: [DONE]"

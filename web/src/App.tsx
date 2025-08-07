@@ -51,7 +51,7 @@ export default function App() {
   const healthCheckRef = useRef<number | null>(null);
 
   const canSend = useMemo(() => {
-    const hasApiKey = serverHasApiKey || userApiKey.trim().length > 0;
+    const hasApiKey = serverHasApiKey === true || userApiKey.trim().length > 0;
     return input.trim().length > 0 && !streaming && isHealthy && hasApiKey;
   }, [input, streaming, isHealthy, serverHasApiKey, userApiKey]);
 
@@ -78,13 +78,24 @@ export default function App() {
           setServerHasApiKey(false);
           return;
         }
+        // For other 500 errors, don't assume server has API key - treat as unknown
+        console.log("Server API key check failed with 500 error:", text);
+        setServerHasApiKey(null); // Keep as unknown, don't assume either way
+        return;
       }
       
-      // If we get here, server likely has an API key configured
-      setServerHasApiKey(true);
+      // Only assume server has API key if we get a successful response or expected error
+      if (response.status === 200 || response.status === 400) {
+        setServerHasApiKey(true);
+      } else {
+        // For other status codes, keep as unknown
+        console.log("Server API key check returned unexpected status:", response.status);
+        setServerHasApiKey(null);
+      }
     } catch (error) {
-      // Network errors or timeouts - assume server has key for now
-      setServerHasApiKey(true);
+      // Network errors or timeouts - don't assume anything about API key status
+      console.log("Server API key check failed with network error:", error);
+      setServerHasApiKey(null); // Keep as unknown
     }
   }, []);
 
@@ -127,9 +138,10 @@ export default function App() {
   useEffect(() => {
     if (serverHasApiKey === false && !userApiKey.trim()) {
       setShowApiKeyConfig(true);
-    } else {
+    } else if (serverHasApiKey === true || userApiKey.trim()) {
       setShowApiKeyConfig(false);
     }
+    // If serverHasApiKey is null (unknown), don't change the current state
   }, [serverHasApiKey, userApiKey]);
 
   // Handle API key submission
@@ -221,8 +233,8 @@ export default function App() {
         };
       }
 
-      // Add user API key if server doesn't have one
-      if (!serverHasApiKey && userApiKey.trim()) {
+      // Add user API key if server doesn't have one or status is unknown
+      if (serverHasApiKey !== true && userApiKey.trim()) {
         req.api_key = userApiKey.trim();
       }
 
